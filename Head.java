@@ -4,16 +4,40 @@ import java.awt.Graphics;
 import java.awt.*;
 
 public class Head extends Tile{
-    int tileSize = 20;
-    int x = 10;
-    int y = 10;
-    Head(String name, Point point){
+    private int width;
+    private int height;
+    Head(String name, Point point, int width, int height){
         super(name, point);
+        this.width = width;
+        this.height = height;
     }
 
-    public Graphics draw(Graphics g, Point point){
-        g.setColor(Color.red);
-        g.fillRect(point.x, point.y, tileSize, tileSize);
-        return g;
+    public Boolean checkForCollision(){
+        return checkInsideWindow();
+    }
+
+    public boolean checkInsideWindow(){
+        if (point.x > width || point.x < 0 || point.y > height || point.y < 0 ) {
+            return false;
+        }else{
+            return true;
+        }
+    }
+
+    public boolean checkForFruit(Point fruitPoint){
+        /* Check for fruits. */
+        if ((point.x == fruitPoint.x) && (point.y == fruitPoint.y)) {
+            return true;
+        }else{
+            return false;
+        }
+    }
+
+    public Point getPoint(){
+        return point;
+    }
+
+    public void setPoint(Point point){
+        this.point = point;
     }
 }

@@ -8,6 +8,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
+import java.util.ArrayList;
 
 public class SnakeScreen extends JPanel implements KeyListener, ActionListener {
     private final int tileSize = 20;
@@ -15,50 +16,43 @@ public class SnakeScreen extends JPanel implements KeyListener, ActionListener {
     private int[] xCoor = new int[tilesTotal];
     private int[] yCoor = new int[tilesTotal];
     private int width, height;
-    private int fruit_x, fruit_y;
-    private int snakeSize = 3; //beginnen met een slang van lengte 3
+    private int snakeSize = 3; //beginnen met een snake van lengte 3
     private boolean inGame = true;
     private static final int UP = 0, DOWN = 1, LEFT = 2, RIGHT = 3;
     private int pressedKey = KeyEvent.VK_DOWN; //naar beneden gaan bij het opstarten
     private int direction = DOWN;
-
-    private Color snake = Color.decode("#00FF00");
+    private final int startSize = 3;
+    private Point headStartPoint;
+    private Color snakeColor = Color.decode("#00FF00");
     private Color bgColor = Color.decode("#808080");
+    private Fruit fruit;
+    private Head head;
+    private ArrayList<Tile> snake = new ArrayList<>();
 
     SnakeScreen(int width, int height){
         this.height = height;
         this.width = width;
         setBackground(bgColor);
 
-        // Set snake starting coordinates.
-        for(int i = 0; i < snakeSize; i++){
-            yCoor[i] = 140 - (i * 30);
-            xCoor[i] = 140;
+        headStartPoint = new Point(140, 140); //de begin coordinaten van de snake
+        //voeg het hoofd toe aan de matrix
+        xCoor[0] = headStartPoint.x;
+        yCoor[0] = headStartPoint.y;
+
+        fruit = new Fruit("Apple", new Point(0,0), tilesTotal);
+        head = new Head("Hoofd", headStartPoint, width, height);
+        snake.add(head);
+        //maak de lichaamsdelen aan en voeg ze aan de matrix toe
+        for(int i = 1; i < startSize; i++){
+            Point point = new Point();
+            point.y = headStartPoint.y - (i * 30);
+            point.x = headStartPoint.x;
+            Body body = new Body(Integer.toString(i), point);
+            snake.add(body); //voeg het lichaamsdeel toe aan de snake
+            xCoor[i] = point.x;
+            yCoor[i] = point.y;
         }
-
-        spawnfruitCoor();
-    }
-
-    public void paintComponent(Graphics g) {
-        super.paintComponent(g);
-        if (inGame) {
-            //teken het fruit
-            g.setColor(Color.red);
-            g.fillRect(fruit_x, fruit_y, tileSize, tileSize);
-
-            //teken de slang
-            g.setColor(snake);
-            for (int i = 0; i < snakeSize; i++) {
-                g.fillRect(xCoor[i], yCoor[i], tileSize, tileSize);
-            }
-
-            //teken de score
-            g.setFont(new Font("Segoe UI", Font.BOLD, 20));
-            g.drawString("Score: " + getScore(), 500, 30);
-
-        } else {
-            gameOver(g);
-        }
+        fruit.spawn();
     }
 
     public void actionPerformed(ActionEvent e) {
@@ -67,44 +61,87 @@ public class SnakeScreen extends JPanel implements KeyListener, ActionListener {
         repaint();
     }
 
-    //sla de toets op
-    public void keyPressed(KeyEvent e) {
-        pressedKey = e.getKeyCode();
+    public void paintComponent(Graphics g) {
+        super.paintComponent(g);
+        if (inGame) {
+            //teken het fruit
+            g.setColor(Color.red);
+            g.fillRect(fruit.getPoint().x, fruit.getPoint().y, tileSize, tileSize);
+
+            //teken de snake
+            g.setColor(snakeColor);
+            for(Tile tile : snake){
+                Point point = tile.getPoint();
+                g.fillRect(point.x, point.y, tileSize, tileSize);
+            }
+
+            //teken de score
+            g.setFont(new Font("Segoe UI", Font.BOLD, 20));
+            g.drawString("Score: " + getScore(), 500, 30);
+        } else {
+            gameOver(g);
+        }
     }
 
-    public void keyReleased(KeyEvent e){}
-    public void keyTyped(KeyEvent e){}
-
     private void checkTile(){
-        /* Check if outside of wall. */
-        if ( xCoor[0] > width || xCoor[0] < 0 || yCoor[0] > height || yCoor[0] < 0 ) {
+        //checken of de snake zich binnen het scherm bevindt
+        if(!head.checkInsideWindow()){
             inGame = false;
+            System.out.println("Game over");
         }
 
-        /* Check for collisions. */
-        for(int i = 1; i < xCoor.length; i++){
-            if (xCoor[0] == xCoor[i] && yCoor[0] == yCoor[i]){
+        //checken of de snake botst met zichzelf
+        Point headPoint = head.getPoint();
+        for(Tile tile : snake){
+            Point point = tile.getPoint();
+            if(point.x == headPoint.x && point.y == headPoint.y && !tile.getName().equals("Hoofd")){
                 inGame = false;
             }
         }
 
-        /* Check for fruits. */
-        if ((xCoor[0] == fruit_x) && (yCoor[0] == fruit_y)) {
-            snakeSize++;
-            spawnfruitCoor();
+        //checken of de snake botst met een stuk fruit
+        if(head.checkForFruit(fruit.getPoint())){
+            addBodyElement(); //voeg een element toe aan de snake
+            fruit.spawn(); //plaats een nieuw fruit stukje
         }
     }
 
-    /** Generates random coordinates for fruit. */
-    private void spawnfruitCoor() {
-        int r = (int) (Math.random() * Math.sqrt(tilesTotal) - 1);
-        fruit_x = ((r * tileSize));
-
-        r = (int) (Math.random() * Math.sqrt(tilesTotal) - 1);
-        fruit_y = ((r * tileSize));
+    private void addBodyElement(){
+        Body body = new Body(""+snake.size()+1, new Point(10,10));
+        snake.add(body);
     }
 
-    /** Simply prints a gameOver-message to screen when called. */
+    private void moveSnake(){
+        for (int i = (snake.size()-1); i > 0; i--) {
+            xCoor[i] = xCoor[(i - 1)];
+            yCoor[i] = yCoor[(i - 1)];
+            snake.get(i).setPoint(new Point(xCoor[i], yCoor[i]));
+        }
+
+        Point newHead = head.getPoint();
+        if(pressedKey == KeyEvent.VK_DOWN && direction != UP){
+            direction = DOWN;
+            newHead.y += tileSize;
+        }else if(pressedKey == KeyEvent.VK_UP && direction != DOWN){
+            direction = UP;
+            newHead.y -= tileSize;
+        }else if(pressedKey == KeyEvent.VK_LEFT && direction != RIGHT){
+            direction = LEFT;
+            newHead.x -= tileSize;
+        }else if(pressedKey == KeyEvent.VK_RIGHT && direction != LEFT){
+            direction = RIGHT;
+            newHead.x += tileSize;
+        }
+        xCoor[0] = newHead.x;
+        yCoor[0] = newHead.y;
+        head.setPoint(newHead);
+
+    }
+
+    private int getScore(){
+        return (snake.size() - 3);
+    }
+
     private void gameOver(Graphics g) {
         g.setColor(Color.white);
         g.setFont(new Font("Segoe UI", Font.BOLD, 20));
@@ -121,31 +158,12 @@ public class SnakeScreen extends JPanel implements KeyListener, ActionListener {
         }
     }
 
-    private void moveSnake(){
-
-        /* Move coordinates up one in the matrix.*/
-        for (int i = snakeSize; i > 0; i--) {
-            xCoor[i] = xCoor[(i - 1)];
-            yCoor[i] = yCoor[(i - 1)];
-        }
-
-        if(pressedKey == KeyEvent.VK_DOWN && direction != UP){
-            direction = DOWN;
-            yCoor[0] += tileSize;
-        }else if(pressedKey == KeyEvent.VK_UP && direction != DOWN){
-            direction = UP;
-            yCoor[0] -= tileSize;
-        }else if(pressedKey == KeyEvent.VK_LEFT && direction != RIGHT){
-            direction = LEFT;
-            xCoor[0] -= tileSize;
-        }else if(pressedKey == KeyEvent.VK_RIGHT && direction != LEFT){
-            direction = RIGHT;
-            xCoor[0] += tileSize;
-        }
+    //sla de toets op
+    public void keyPressed(KeyEvent e) {
+        pressedKey = e.getKeyCode();
     }
 
-    private String getScore(){
-        return "" + (snakeSize - 3);
-    }
+    public void keyReleased(KeyEvent e){}
+    public void keyTyped(KeyEvent e){}
 
 }
